@@ -15,6 +15,7 @@ function App() {
   const [complexity, setComplexity] = useState(50); // 1-100
   const [maxColors, setMaxColors] = useState(15);
   const [blackAndWhite, setBlackAndWhite] = useState(false);
+  const [zoom, setZoom] = useState(1.0);
 
   const [colorOverrides, setColorOverrides] = useState({}); // { [originalFloss]: targetFloss }
 
@@ -87,6 +88,19 @@ function App() {
               </div>
 
               <div className="control-group">
+                <label>Zoom Level</label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="3"
+                  step="0.1"
+                  value={zoom}
+                  onChange={(e) => setZoom(parseFloat(e.target.value))}
+                />
+                <span>{Math.round(zoom * 100)}%</span>
+              </div>
+
+              <div className="control-group">
                 <label>
                   <input
                     type="checkbox"
@@ -111,6 +125,7 @@ function App() {
                   settings={{ blackAndWhite }}
                   colorOverrides={colorOverrides}
                   maxColors={maxColors}
+                  zoom={zoom}
                   onPatternGenerated={setPatternStats}
                 />
               )}

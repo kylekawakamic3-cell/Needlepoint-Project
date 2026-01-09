@@ -4,18 +4,25 @@ import { findNearestColor, findNearestGrayColor, reducePalette } from '../utils/
 
 import { dmcColors } from '../utils/dmcData';
 
-const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPatternGenerated }) => {
+const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, zoom, onPatternGenerated }) => {
     const canvasRef = useRef(null);
+    const containerRef = useRef(null);
     const [pattern, setPattern] = useState(null);
 
     useEffect(() => {
         if (!imageData || !canvasRef.current) return;
 
-        const { width, height, data, pixelSize } = imageData;
+        const { width, height, data } = imageData;
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
 
-        const displayStitchSize = 10;
+        // ASPECT-RATIO AWARE AUTO-FIT:
+        // We want the pattern to fit within a ~700x700 viewport optimally.
+        const viewportSize = 700;
+        const scaleW = viewportSize / width;
+        const scaleH = viewportSize / height;
+        // Use the smaller scale to ensure the whole image fits in the viewfinder
+        const displayStitchSize = Math.min(scaleW, scaleH);
 
         canvas.width = width * displayStitchSize;
         canvas.height = height * displayStitchSize;
@@ -24,8 +31,6 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPattern
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Pre-calculation pass for Auto-Reduction
-        // We need to know all colors first to reduce them.
-        // We will store "raw" dmc colors for each pixel in a temp grid to avoid recalculating nearestColor twice.
         const pixelGrid = []; // Array of DMC objects
         const rawCounts = {};
 
@@ -39,7 +44,6 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPattern
                     dmcColor = findNearestColor(pixel.r, pixel.g, pixel.b);
                 }
 
-                // Check for MANUAL overrides first
                 if (colorOverrides && colorOverrides[dmcColor.floss]) {
                     const targetFlossId = colorOverrides[dmcColor.floss];
                     const targetColor = dmcColors.find(c => c.floss === targetFlossId);
@@ -57,14 +61,11 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPattern
             }
         }
 
-        // Calculate Auto-Reduction Map
         let reductionMap = {};
         if (maxColors && maxColors > 0) {
             reductionMap = reducePalette(rawCounts, maxColors);
         }
 
-        // Generate SYMBOL MAP
-        // Get unique final colors after reduction
         const uniqueColorsSet = new Set();
         pixelGrid.forEach(c => {
             const finalFloss = reductionMap[c.floss] || c.floss;
@@ -77,7 +78,6 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPattern
             symbolMap[floss] = symbols[i % symbols.length];
         });
 
-        // Second pass: Render
         const finalCounts = {};
 
         ctx.font = `${displayStitchSize * 0.7}px sans-serif`;
@@ -89,7 +89,6 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPattern
                 const index = y * width + x;
                 let dmcColor = pixelGrid[index];
 
-                // Apply Auto-Reduction
                 if (reductionMap[dmcColor.floss]) {
                     const targetFlossId = reductionMap[dmcColor.floss];
                     const targetColor = dmcColors.find(c => c.floss === targetFlossId);
@@ -98,23 +97,18 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPattern
                     }
                 }
 
-                // Draw stitch
                 ctx.fillStyle = `rgb(${dmcColor.r}, ${dmcColor.g}, ${dmcColor.b})`;
                 ctx.fillRect(x * displayStitchSize, y * displayStitchSize, displayStitchSize, displayStitchSize);
 
-                // Draw Symbol
                 const symbol = symbolMap[dmcColor.floss];
-                // Determine text color based on brightness
                 const brightness = (dmcColor.r * 299 + dmcColor.g * 587 + dmcColor.b * 114) / 1000;
                 ctx.fillStyle = brightness > 128 ? 'black' : 'white';
                 ctx.fillText(symbol, x * displayStitchSize + displayStitchSize / 2, y * displayStitchSize + displayStitchSize / 2);
 
-                // Grid lines
                 ctx.strokeStyle = 'rgba(0,0,0,0.1)';
                 ctx.lineWidth = 1;
                 ctx.strokeRect(x * displayStitchSize, y * displayStitchSize, displayStitchSize, displayStitchSize);
 
-                // Major grid lines (every 10)
                 if (x % 10 === 0 && x > 0) {
                     ctx.strokeStyle = 'rgba(0,0,0,0.3)';
                     ctx.beginPath();
@@ -130,7 +124,6 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPattern
                     ctx.stroke();
                 }
 
-                // Count final colors
                 if (!finalCounts[dmcColor.floss]) {
                     finalCounts[dmcColor.floss] = { ...dmcColor, symbol: symbol, count: 0 };
                 }
@@ -140,7 +133,6 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPattern
 
         setPattern(pixelGrid);
 
-        // Notify parent with materials
         onPatternGenerated({
             colors: Object.values(finalCounts),
             totalStitches: width * height,
@@ -148,11 +140,29 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPattern
             height
         });
 
-    }, [imageData, settings, colorOverrides, maxColors]); // Added missing deps
+    }, [imageData, settings, colorOverrides, maxColors]);
 
     return (
-        <div className="pattern-grid-wrapper">
-            <canvas ref={canvasRef} />
+        <div className="pattern-grid-wrapper" ref={containerRef}>
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                padding: '40px',
+                minWidth: '100%',
+                minHeight: '100%'
+            }}>
+                <canvas
+                    ref={canvasRef}
+                    style={{
+                        transform: `scale(${zoom})`,
+                        transformOrigin: 'center center',
+                        transition: 'transform 0.1s ease-out',
+                        boxShadow: '0 0 0 1px #ddd',
+                        backgroundColor: 'white'
+                    }}
+                />
+            </div>
         </div>
     );
 };
