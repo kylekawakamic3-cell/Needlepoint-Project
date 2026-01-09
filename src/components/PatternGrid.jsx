@@ -110,7 +110,7 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPattern
     }, [imageData, settings]); // Re-run when image or settings change
 
     return (
-        <div style={{ overflow: 'auto', maxHeight: '600px', border: '1px solid #ddd' }}>
+        <div className="pattern-grid-wrapper">
             <canvas ref={canvasRef} />
         </div>
     );
