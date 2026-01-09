@@ -76,11 +76,11 @@ function App() {
                 <input
                   type="range"
                   min="2"
-                  max="100"
+                  max="15"
                   value={maxColors}
                   onChange={(e) => setMaxColors(parseInt(e.target.value))}
                 />
-                <span>{maxColors === 100 ? 'Unlimited' : maxColors}</span>
+                <span>{maxColors === 15 ? '15 (Simplified)' : maxColors}</span>
                 <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '5px' }}>
                   Reduces confetti by merging similar colors.
                 </p>
