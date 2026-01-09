@@ -80,6 +80,7 @@ const MaterialList = ({ usageData, colorOverrides, onColorMerge }) => {
                     <thead>
                         <tr style={{ borderBottom: '2px solid #eee', textAlign: 'left' }}>
                             <th style={{ padding: '8px' }}>Color</th>
+                            <th style={{ padding: '8px' }}>Symbol</th>
                             <th style={{ padding: '8px' }}>DMC #</th>
                             <th style={{ padding: '8px' }}>Name</th>
                             <th style={{ padding: '8px' }}>Stitches</th>
@@ -91,11 +92,6 @@ const MaterialList = ({ usageData, colorOverrides, onColorMerge }) => {
                         {sortedColors.map(c => {
                             const skeins = Math.ceil(c.count / 2000);
 
-                            // Check if this color is a result of an override? 
-                            // usageData comes from PatternGrid which already applied overrides.
-                            // But we might want to know if it IS an override target to show it differently?
-                            // For simplicity, just show current state.
-
                             return (
                                 <tr key={c.floss} style={{ borderBottom: '1px solid #f9f9f9' }}>
                                     <td style={{ padding: '8px' }}>
@@ -106,6 +102,9 @@ const MaterialList = ({ usageData, colorOverrides, onColorMerge }) => {
                                             border: '1px solid #ddd',
                                             borderRadius: '4px'
                                         }} title={c.hex}></div>
+                                    </td>
+                                    <td style={{ padding: '8px' }}>
+                                        <span className="thread-symbol">{c.symbol}</span>
                                     </td>
                                     <td style={{ padding: '8px' }}>{c.floss}</td>
                                     <td style={{ padding: '8px' }}>{c.description}</td>
