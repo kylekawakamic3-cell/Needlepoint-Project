@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getPixelColor } from '../utils/imageProcessing';
-import { findNearestColor, findNearestGrayColor, reducePalette } from '../utils/colorMatching';
+import { quantizeImage } from '../utils/quantization';
+import { findNearestColor } from '../utils/colorMatching';
 
 import { dmcColors } from '../utils/dmcData';
 
@@ -30,7 +31,28 @@ const PatternGrid = ({ imageData, colorOverrides, maxColors, zoom, onPatternGene
         // Clear
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Pre-calculation pass for Auto-Reduction
+        // Pre-calculation pass: K-Means Quantization
+        // Instead of processing every pixel individually then frequency reducing,
+        // we first find the best 'maxColors' palette for the entire image.
+
+        let paletteDMC = [];
+
+        // 1. Run K-Means to find dominant RGB centroids
+        if (maxColors && maxColors > 0) {
+            const centroids = quantizeImage(data, maxColors);
+
+            // 2. Convert Centroids to DMC
+            paletteDMC = centroids.map(c => findNearestColor(c.r, c.g, c.b));
+
+            // Ensure unique DMC colors (K-Means might find 2 RGBs that map to same DMC)
+            const uniqueDMC = new Map();
+            paletteDMC.forEach(dmc => uniqueDMC.set(dmc.floss, dmc));
+            paletteDMC = Array.from(uniqueDMC.values());
+        }
+
+        // If K-Means failed or maxColors undefined, fallback? 
+        // Logic below handles mapping.
+
         const pixelGrid = []; // Array of DMC objects
         const rawCounts = {};
 
@@ -40,24 +62,35 @@ const PatternGrid = ({ imageData, colorOverrides, maxColors, zoom, onPatternGene
 
                 // GUARD: Check for valid pixel data
                 if (pixel.r === undefined || pixel.g === undefined || pixel.b === undefined || isNaN(pixel.r)) {
-                    // Default to white or skip
                     pixel.r = 255; pixel.g = 255; pixel.b = 255;
                 }
 
-                // Handle transparency
                 if (pixel.a < 10) {
-                    // transparent, treat as white
                     pixel.r = 255; pixel.g = 255; pixel.b = 255;
                 }
 
-                let dmcColor = findNearestColor(pixel.r, pixel.g, pixel.b);
+                // If we have a restricted palette from K-Means, find nearest in THAT palette.
+                // Otherwise find nearest in full DMC list.
+                let dmcColor;
 
-                // GUARD: Check if dmcColor is valid
-                if (!dmcColor) {
-                    console.error("No matching DMC color found for:", pixel);
-                    continue; // Should likely fallback to a default
+                if (paletteDMC.length > 0) {
+                    // Find nearest in reduced palette
+                    let minState = Infinity;
+                    let best = paletteDMC[0];
+                    for (const p of paletteDMC) {
+                        const dist = Math.sqrt((pixel.r - p.r) ** 2 + (pixel.g - p.g) ** 2 + (pixel.b - p.b) ** 2);
+                        if (dist < minState) {
+                            minState = dist;
+                            best = p;
+                        }
+                    }
+                    dmcColor = best;
+                } else {
+                    // Fallback to full search (shouldn't happen if maxColors set)
+                    dmcColor = findNearestColor(pixel.r, pixel.g, pixel.b);
                 }
 
+                // Apply manual overrides
                 if (colorOverrides && colorOverrides[dmcColor.floss]) {
                     const targetFlossId = colorOverrides[dmcColor.floss];
                     const targetColor = dmcColors.find(c => c.floss === targetFlossId);
@@ -75,16 +108,8 @@ const PatternGrid = ({ imageData, colorOverrides, maxColors, zoom, onPatternGene
             }
         }
 
-        let reductionMap = {};
-        if (maxColors && maxColors > 0) {
-            reductionMap = reducePalette(rawCounts, maxColors);
-        }
-
-        const uniqueColorsSet = new Set();
-        pixelGrid.forEach(c => {
-            const finalFloss = reductionMap[c.floss] || c.floss;
-            uniqueColorsSet.add(finalFloss);
-        });
+        // Symbol Generation
+        const uniqueColorsSet = new Set(Object.keys(rawCounts));
         const sortedColors = Array.from(uniqueColorsSet).sort();
         const symbols = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#*@+".split("");
         const symbolMap = {};
@@ -102,14 +127,6 @@ const PatternGrid = ({ imageData, colorOverrides, maxColors, zoom, onPatternGene
             for (let x = 0; x < width; x++) {
                 const index = y * width + x;
                 let dmcColor = pixelGrid[index];
-
-                if (reductionMap[dmcColor.floss]) {
-                    const targetFlossId = reductionMap[dmcColor.floss];
-                    const targetColor = dmcColors.find(c => c.floss === targetFlossId);
-                    if (targetColor) {
-                        dmcColor = targetColor;
-                    }
-                }
 
                 ctx.fillStyle = `rgb(${dmcColor.r}, ${dmcColor.g}, ${dmcColor.b})`;
                 ctx.fillRect(x * displayStitchSize, y * displayStitchSize, displayStitchSize, displayStitchSize);

@@ -61,13 +61,10 @@ export const findNearestColor = (r, g, b) => {
  * @returns {Object} - { [fromFlossId]: toFlossId } mapping
  */
 export const reducePalette = (colorCounts, maxColors) => {
-    // 1. Identify Core Colors (CMYK + BW)
+    // 1. Identify Core Colors (BW only to allow image colors to shine)
     const CORE_PALETTE_IDS = [
         "310",  // Black
         "5200", // White (Snow White)
-        "996",  // Cyan (Electric Blue Medium)
-        "602",  // Magenta (Cranberry) - Vibrant Pink/Purple
-        "444",  // Yellow (Lemon Dark)
     ];
 
     // Get all available colors from the inputs
