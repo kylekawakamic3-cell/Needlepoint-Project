@@ -20,14 +20,28 @@ const colorDistance = (c1, c2) => {
 export const findNearestColor = (r, g, b) => {
     let minDistance = Infinity;
     let nearest = dmcColors[0];
+    let validMatchFound = false;
+
+    // Validate inputs immediately
+    if (isNaN(r) || isNaN(g) || isNaN(b)) {
+        console.warn("findNearestColor received NaN:", { r, g, b });
+        // Return White as safety default instead of Pink
+        return dmcColors.find(c => c.floss === "5200") || nearest;
+    }
 
     for (const dmc of dmcColors) {
         const dist = colorDistance({ r, g, b }, dmc);
-        if (dist < minDistance) {
+        if (!isNaN(dist) && dist < minDistance) {
             minDistance = dist;
             nearest = dmc;
+            validMatchFound = true;
         }
     }
+
+    if (!validMatchFound) {
+        console.warn("No valid match found for:", { r, g, b }, "Defaulting to:", nearest.description);
+    }
+
     return nearest;
 };
 
