@@ -63,8 +63,26 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPattern
             reductionMap = reducePalette(rawCounts, maxColors);
         }
 
+        // Generate SYMBOL MAP
+        // Get unique final colors after reduction
+        const uniqueColorsSet = new Set();
+        pixelGrid.forEach(c => {
+            const finalFloss = reductionMap[c.floss] || c.floss;
+            uniqueColorsSet.add(finalFloss);
+        });
+        const sortedColors = Array.from(uniqueColorsSet).sort();
+        const symbols = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#*@+".split("");
+        const symbolMap = {};
+        sortedColors.forEach((floss, i) => {
+            symbolMap[floss] = symbols[i % symbols.length];
+        });
+
         // Second pass: Render
         const finalCounts = {};
+
+        ctx.font = `${displayStitchSize * 0.7}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
 
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
@@ -84,14 +102,37 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPattern
                 ctx.fillStyle = `rgb(${dmcColor.r}, ${dmcColor.g}, ${dmcColor.b})`;
                 ctx.fillRect(x * displayStitchSize, y * displayStitchSize, displayStitchSize, displayStitchSize);
 
-                // Optional: Draw grid lines?
+                // Draw Symbol
+                const symbol = symbolMap[dmcColor.floss];
+                // Determine text color based on brightness
+                const brightness = (dmcColor.r * 299 + dmcColor.g * 587 + dmcColor.b * 114) / 1000;
+                ctx.fillStyle = brightness > 128 ? 'black' : 'white';
+                ctx.fillText(symbol, x * displayStitchSize + displayStitchSize / 2, y * displayStitchSize + displayStitchSize / 2);
+
+                // Grid lines
                 ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                ctx.lineWidth = 1;
                 ctx.strokeRect(x * displayStitchSize, y * displayStitchSize, displayStitchSize, displayStitchSize);
 
+                // Major grid lines (every 10)
+                if (x % 10 === 0 && x > 0) {
+                    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                    ctx.beginPath();
+                    ctx.moveTo(x * displayStitchSize, 0);
+                    ctx.lineTo(x * displayStitchSize, canvas.height);
+                    ctx.stroke();
+                }
+                if (y % 10 === 0 && y > 0) {
+                    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                    ctx.beginPath();
+                    ctx.moveTo(0, y * displayStitchSize);
+                    ctx.lineTo(canvas.width, y * displayStitchSize);
+                    ctx.stroke();
+                }
 
                 // Count final colors
                 if (!finalCounts[dmcColor.floss]) {
-                    finalCounts[dmcColor.floss] = { ...dmcColor, count: 0 };
+                    finalCounts[dmcColor.floss] = { ...dmcColor, symbol: symbol, count: 0 };
                 }
                 finalCounts[dmcColor.floss].count++;
             }
@@ -107,7 +148,7 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, onPattern
             height
         });
 
-    }, [imageData, settings]); // Re-run when image or settings change
+    }, [imageData, settings, colorOverrides, maxColors]); // Added missing deps
 
     return (
         <div className="pattern-grid-wrapper">

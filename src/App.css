@@ -136,6 +136,16 @@ input[type="checkbox"] {
   /* Ensure background matches */
 }
 
+.thread-symbol {
+  font-weight: bold;
+  font-size: 1.1rem;
+  min-width: 25px;
+  text-align: center;
+  border: 1px solid #ddd;
+  background: #eee;
+  border-radius: 4px;
+}
+
 .material-list h2 {
   margin-top: 0;
   font-size: 1.2rem;
