@@ -17,7 +17,7 @@ export const quantizeImage = (data, k, maxIterations = 5) => {
     // 1. Gather points (ignore transparent)
     // Optimization: If too many points, sample randomly
     const points = [];
-    const step = Math.max(1, Math.floor(data.length / 4 / 2000)); // Target ~2000 points for speed
+    const step = Math.max(1, Math.floor(data.length / 4 / 4000)); // Target ~4000 points for better outlier detection
 
     for (let i = 0; i < data.length; i += 4 * step) {
         if (data[i + 3] > 128) { // Only opaque
@@ -27,25 +27,45 @@ export const quantizeImage = (data, k, maxIterations = 5) => {
 
     if (points.length === 0) return []; // Empty image
 
-    // 2. Initialize Centroids
-    // Strategy: K-Means++ or just simple sampling?
-    // User wants Black/White structure favored. Let's seed with Black/White if K > 2.
-    let centroids = [];
-    if (k >= 2) {
-        centroids.push({ r: 0, g: 0, b: 0 }); // Black
-        centroids.push({ r: 255, g: 255, b: 255 }); // White
-    }
+    // 2. Initialize Centroids (K-Means++ "Outlier Hunting")
+    // Strategy: Deterministically pick points that are furthest from existing centroids.
 
-    // Fill remaining k with random points from the image
-    while (centroids.length < k) {
-        const p = points[Math.floor(Math.random() * points.length)];
-        centroids.push({ ...p });
-    }
-    // Trim if we forced too many (unlikely given check)
+    let centroids = [];
+
+    // Always start with Black & White to anchor structure (if k >= 2)
+    if (k >= 1) centroids.push({ r: 0, g: 0, b: 0 }); // Black
+    if (k >= 2) centroids.push({ r: 255, g: 255, b: 255 }); // White
+
+    // If k < 2, just keep what we have (unlikely)
     if (centroids.length > k) centroids = centroids.slice(0, k);
 
+    // K-Means++ Loop
+    while (centroids.length < k) {
+        let maxDistSq = -1;
+        let bestPoint = points[0];
 
-    // 3. Iteration Loop
+        // Find the point effectively "furthest" from all current centroids
+        for (const p of points) {
+            let minDistToAnyCentroid = Infinity;
+
+            for (const c of centroids) {
+                const d = distSq(p, c);
+                if (d < minDistToAnyCentroid) {
+                    minDistToAnyCentroid = d;
+                }
+            }
+
+            if (minDistToAnyCentroid > maxDistSq) {
+                maxDistSq = minDistToAnyCentroid;
+                bestPoint = p;
+            }
+        }
+
+        // Add the outlier
+        centroids.push({ ...bestPoint });
+    }
+
+    // 3. Iteration Loop (Standard K-Means)
     for (let iter = 0; iter < maxIterations; iter++) {
         const clusters = new Array(k).fill(0).map(() => ({ r: 0, g: 0, b: 0, count: 0 }));
 
