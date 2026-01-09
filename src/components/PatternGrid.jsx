@@ -37,11 +37,30 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, zoom, onP
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const pixel = getPixelColor(data, x, y, width);
+
+                // GUARD: Check for valid pixel data
+                if (pixel.r === undefined || pixel.g === undefined || pixel.b === undefined || isNaN(pixel.r)) {
+                    // Default to white or skip
+                    pixel.r = 255; pixel.g = 255; pixel.b = 255;
+                }
+
+                // Handle transparency
+                if (pixel.a < 10) {
+                    // transparent, treat as white
+                    pixel.r = 255; pixel.g = 255; pixel.b = 255;
+                }
+
                 let dmcColor;
                 if (settings.blackAndWhite) {
                     dmcColor = findNearestGrayColor(pixel.r, pixel.g, pixel.b);
                 } else {
                     dmcColor = findNearestColor(pixel.r, pixel.g, pixel.b);
+                }
+
+                // GUARD: Check if dmcColor is valid
+                if (!dmcColor) {
+                    console.error("No matching DMC color found for:", pixel);
+                    continue; // Should likely fallback to a default
                 }
 
                 if (colorOverrides && colorOverrides[dmcColor.floss]) {
