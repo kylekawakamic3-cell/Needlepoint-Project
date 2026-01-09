@@ -45,26 +45,7 @@ export const findNearestColor = (r, g, b) => {
     return nearest;
 };
 
-export const findNearestGrayColor = (r, g, b) => {
-    // Convert input to grayscale
-    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-
-    // Find nearest color based on grayscale value of the DMC colors.
-
-    let minDistance = Infinity;
-    let nearest = dmcColors[0];
-
-    for (const dmc of dmcColors) {
-        // Calculate gray for DMC color
-        const dmcGray = 0.299 * dmc.r + 0.587 * dmc.g + 0.114 * dmc.b;
-        const dist = Math.abs(gray - dmcGray);
-        if (dist < minDistance) {
-            minDistance = dist;
-            nearest = dmc;
-        }
-    }
-    return nearest;
-};
+// findNearestGrayColor removed as Black & White mode is deprecated
 
 /**
  * Reduces a map of color counts to a target maximum size by merging least frequent colors.

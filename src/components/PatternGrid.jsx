@@ -4,7 +4,7 @@ import { findNearestColor, findNearestGrayColor, reducePalette } from '../utils/
 
 import { dmcColors } from '../utils/dmcData';
 
-const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, zoom, onPatternGenerated }) => {
+const PatternGrid = ({ imageData, colorOverrides, maxColors, zoom, onPatternGenerated, gridRef }) => {
     const canvasRef = useRef(null);
     const containerRef = useRef(null);
     const [pattern, setPattern] = useState(null);
@@ -50,12 +50,7 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, zoom, onP
                     pixel.r = 255; pixel.g = 255; pixel.b = 255;
                 }
 
-                let dmcColor;
-                if (settings.blackAndWhite) {
-                    dmcColor = findNearestGrayColor(pixel.r, pixel.g, pixel.b);
-                } else {
-                    dmcColor = findNearestColor(pixel.r, pixel.g, pixel.b);
-                }
+                let dmcColor = findNearestColor(pixel.r, pixel.g, pixel.b);
 
                 // GUARD: Check if dmcColor is valid
                 if (!dmcColor) {
@@ -159,7 +154,14 @@ const PatternGrid = ({ imageData, settings, colorOverrides, maxColors, zoom, onP
             height
         });
 
-    }, [imageData, settings, colorOverrides, maxColors]);
+    }, [imageData, colorOverrides, maxColors]);
+
+    // Expose canvas via gridRef if provided
+    useEffect(() => {
+        if (gridRef) {
+            gridRef.current = canvasRef.current;
+        }
+    }, [gridRef]);
 
     return (
         <div className="pattern-grid-wrapper" ref={containerRef}>
