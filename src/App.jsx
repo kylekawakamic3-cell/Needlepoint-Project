@@ -50,7 +50,7 @@ function App() {
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>Needlepoint Pattern Converter</h1>
+        <h1>Cross Stitch Pattern Converter</h1>
         <p>Convert any image into a cross-stitch pattern with DMC thread matching.</p>
       </header>
 

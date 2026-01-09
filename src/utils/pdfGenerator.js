@@ -12,7 +12,7 @@ export const generatePDF = (canvas, patternStats) => {
     // --- PAGE 1: PATTERN OVERVIEW ---
     doc.setFontSize(22);
     doc.setTextColor(236, 72, 153); // Pink-600
-    doc.text("Needlepoint Pattern", pageWidth / 2, 20, { align: 'center' });
+    doc.text("Cross Stitch Pattern", pageWidth / 2, 20, { align: 'center' });
 
     doc.setFontSize(12);
     doc.setTextColor(60, 60, 60);
@@ -79,5 +79,5 @@ export const generatePDF = (canvas, patternStats) => {
     });
 
     // Save
-    doc.save('needlepoint-pattern.pdf');
+    doc.save('cross-stitch-pattern.pdf');
 };
