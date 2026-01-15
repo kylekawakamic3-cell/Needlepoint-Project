@@ -5,10 +5,36 @@ import { findNearestColor } from '../utils/colorMatching';
 
 import { dmcColors } from '../utils/dmcData';
 
-const PatternGrid = ({ imageData, colorOverrides, maxColors, zoom, onPatternGenerated, gridRef }) => {
+const PatternGrid = ({ imageData, colorOverrides, maxColors, zoom, showGrid = true, onPatternGenerated, gridRef }) => {
     const canvasRef = useRef(null);
     const containerRef = useRef(null);
     const [pattern, setPattern] = useState(null);
+    const [containerSize, setContainerSize] = useState({ width: 300, height: 300 });
+
+    // Track container size
+    useEffect(() => {
+        if (!containerRef.current) return;
+
+        const updateSize = () => {
+            const container = containerRef.current;
+            if (container) {
+                const rect = container.getBoundingClientRect();
+                // Leave margin around the pattern
+                const margin = 40;
+                setContainerSize({
+                    width: Math.max(100, rect.width - margin * 2),
+                    height: Math.max(100, rect.height - margin * 2)
+                });
+            }
+        };
+
+        updateSize();
+
+        const resizeObserver = new ResizeObserver(updateSize);
+        resizeObserver.observe(containerRef.current);
+
+        return () => resizeObserver.disconnect();
+    }, []);
 
     useEffect(() => {
         if (!imageData || !canvasRef.current) return;
@@ -18,10 +44,9 @@ const PatternGrid = ({ imageData, colorOverrides, maxColors, zoom, onPatternGene
         const ctx = canvas.getContext('2d');
 
         // ASPECT-RATIO AWARE AUTO-FIT:
-        // We want the pattern to fit within a ~700x700 viewport optimally.
-        const viewportSize = 700;
-        const scaleW = viewportSize / width;
-        const scaleH = viewportSize / height;
+        // We want the pattern to fit within the container optimally.
+        const scaleW = containerSize.width / width;
+        const scaleH = containerSize.height / height;
         // Use the smaller scale to ensure the whole image fits in the viewfinder
         const displayStitchSize = Math.min(scaleW, scaleH);
 
@@ -140,14 +165,14 @@ const PatternGrid = ({ imageData, colorOverrides, maxColors, zoom, onPatternGene
                 ctx.lineWidth = 1;
                 ctx.strokeRect(x * displayStitchSize, y * displayStitchSize, displayStitchSize, displayStitchSize);
 
-                if (x % 10 === 0 && x > 0) {
+                if (showGrid && x % 10 === 0 && x > 0) {
                     ctx.strokeStyle = 'rgba(0,0,0,0.3)';
                     ctx.beginPath();
                     ctx.moveTo(x * displayStitchSize, 0);
                     ctx.lineTo(x * displayStitchSize, canvas.height);
                     ctx.stroke();
                 }
-                if (y % 10 === 0 && y > 0) {
+                if (showGrid && y % 10 === 0 && y > 0) {
                     ctx.strokeStyle = 'rgba(0,0,0,0.3)';
                     ctx.beginPath();
                     ctx.moveTo(0, y * displayStitchSize);
@@ -171,7 +196,7 @@ const PatternGrid = ({ imageData, colorOverrides, maxColors, zoom, onPatternGene
             height
         });
 
-    }, [imageData, colorOverrides, maxColors]);
+    }, [imageData, colorOverrides, maxColors, showGrid, containerSize]);
 
     // Expose canvas via gridRef if provided
     useEffect(() => {
@@ -182,25 +207,16 @@ const PatternGrid = ({ imageData, colorOverrides, maxColors, zoom, onPatternGene
 
     return (
         <div className="pattern-grid-wrapper" ref={containerRef}>
-            <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                padding: '40px',
-                minWidth: '100%',
-                minHeight: '100%'
-            }}>
-                <canvas
-                    ref={canvasRef}
-                    style={{
-                        transform: `scale(${zoom})`,
-                        transformOrigin: 'center center',
-                        transition: 'transform 0.1s ease-out',
-                        boxShadow: '0 0 0 1px #ddd',
-                        backgroundColor: 'white'
-                    }}
-                />
-            </div>
+            <canvas
+                ref={canvasRef}
+                style={{
+                    transform: `scale(${zoom})`,
+                    transformOrigin: 'center center',
+                    transition: 'transform 0.1s ease-out',
+                    boxShadow: '0 0 0 1px #ddd',
+                    backgroundColor: 'white'
+                }}
+            />
         </div>
     );
 };

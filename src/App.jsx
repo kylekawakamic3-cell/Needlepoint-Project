@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ImageUploader from './components/ImageUploader';
 import PatternGrid from './components/PatternGrid';
 import MaterialList from './components/MaterialList';
@@ -10,14 +10,68 @@ function App() {
   const [originalImage, setOriginalImage] = useState(null);
   const [imageData, setImageData] = useState(null);
   const [patternStats, setPatternStats] = useState(null);
-  const gridRef = React.useRef(null); // Ref to access canvas
+  const gridRef = useRef(null);
 
   // Settings
-  const [complexity, setComplexity] = useState(50); // 1-100
-  const [maxColors, setMaxColors] = useState(15);
+  const [maxColors, setMaxColors] = useState(24);
+  const [showGrid, setShowGrid] = useState(true);
   const [zoom, setZoom] = useState(1.0);
+  const [complexity, setComplexity] = useState(50);
 
-  const [colorOverrides, setColorOverrides] = useState({}); // { [originalFloss]: targetFloss }
+  // Bottom sheet drag state
+  const [panelHeight, setPanelHeight] = useState(50); // percentage of viewport
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartY = useRef(0);
+  const dragStartHeight = useRef(0);
+
+  const handleDragStart = useCallback((e) => {
+    e.preventDefault();
+    setIsDragging(true);
+    const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+    dragStartY.current = clientY;
+    dragStartHeight.current = panelHeight;
+  }, [panelHeight]);
+
+  const handleDragMove = useCallback((e) => {
+    if (!isDragging) return;
+
+    const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+    const deltaY = dragStartY.current - clientY;
+    const viewportHeight = window.innerHeight - 60; // subtract header height
+    const deltaPercent = (deltaY / viewportHeight) * 100;
+
+    let newHeight = dragStartHeight.current + deltaPercent;
+    // Clamp between 20% and 80%
+    newHeight = Math.max(20, Math.min(80, newHeight));
+    setPanelHeight(newHeight);
+  }, [isDragging]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Add/remove global mouse/touch listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleDragMove);
+      document.addEventListener('mouseup', handleDragEnd);
+      document.addEventListener('touchmove', handleDragMove);
+      document.addEventListener('touchend', handleDragEnd);
+      document.body.style.cursor = 'ns-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+      document.removeEventListener('touchmove', handleDragMove);
+      document.removeEventListener('touchend', handleDragEnd);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isDragging, handleDragMove, handleDragEnd]);
+
+  const [colorOverrides, setColorOverrides] = useState({});
 
   // Re-process image when complexity changes
   useEffect(() => {
@@ -29,7 +83,6 @@ function App() {
 
   const handleImageUpload = (img) => {
     setOriginalImage(img);
-    // Reset stats & overrides
     setPatternStats(null);
     setColorOverrides({});
   };
@@ -47,11 +100,31 @@ function App() {
     }
   };
 
+  const handleRefresh = () => {
+    if (originalImage) {
+      const data = processImage(originalImage, complexity);
+      setImageData(data);
+    }
+  };
+
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>Cross Stitch Pattern Converter</h1>
-        <p>Convert any image into a cross-stitch pattern with DMC thread matching.</p>
+        <div className="header-left">
+          <div className="header-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="3" y1="9" x2="21" y2="9" />
+              <line x1="9" y1="21" x2="9" y2="9" />
+            </svg>
+          </div>
+          <h1>Pattern Gen</h1>
+        </div>
+        {originalImage && (
+          <button className="export-btn" onClick={handleExportPDF}>
+            Export
+          </button>
+        )}
       </header>
 
       <main className="app-content">
@@ -60,92 +133,86 @@ function App() {
             <ImageUploader onImageUpload={handleImageUpload} />
           </div>
         ) : (
-          <div className="editor-container">
-            <div className="controls-sidebar">
-              <button className="btn-secondary" onClick={() => setOriginalImage(null)}>
-                ← Start Over
+          <>
+            <div className="preview-area" style={{ height: `${100 - panelHeight}%` }}>
+              <div className="pattern-container">
+                {imageData && (
+                  <PatternGrid
+                    imageData={imageData}
+                    colorOverrides={colorOverrides}
+                    maxColors={maxColors}
+                    zoom={zoom}
+                    showGrid={showGrid}
+                    onPatternGenerated={setPatternStats}
+                    gridRef={gridRef}
+                  />
+                )}
+              </div>
+              <button className="refresh-btn" onClick={handleRefresh} title="Refresh pattern">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
               </button>
+            </div>
 
-              <div className="control-group">
-                <button
-                  onClick={handleExportPDF}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: '#ec4899',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontWeight: 'bold',
-                    fontSize: '1rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(236, 72, 153, 0.3)'
-                  }}
-                >
-                  Download PDF Pattern 📄
-                </button>
-              </div>
+            <div className="controls-panel" style={{ height: `${panelHeight}%` }}>
+              <div
+                className="panel-handle"
+                onMouseDown={handleDragStart}
+                onTouchStart={handleDragStart}
+              ></div>
+              <h2 className="panel-title">Pattern Controls</h2>
 
-              <div className="control-group">
-                <label>Complexity / Size</label>
-                <input
-                  type="range"
-                  min="1"
-                  max="100"
-                  value={complexity}
-                  onChange={(e) => setComplexity(parseInt(e.target.value))}
-                />
-                <span>{complexity}%</span>
-              </div>
-
-              <div className="control-group">
-                <label>Max Colors (Auto-Reduce)</label>
+              <div className="control-row">
+                <div className="control-header">
+                  <span className="control-label">Thread Colors</span>
+                  <span className="control-value">{maxColors}</span>
+                </div>
                 <input
                   type="range"
                   min="2"
-                  max="15"
+                  max="30"
                   value={maxColors}
                   onChange={(e) => setMaxColors(parseInt(e.target.value))}
                 />
-                <span>{maxColors === 15 ? '15 (Simplified)' : maxColors}</span>
-                <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '5px' }}>
-                  Reduces confetti by merging similar colors.
-                </p>
               </div>
 
-              <div className="control-group">
-                <label>Zoom Level</label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="3"
-                  step="0.1"
-                  value={zoom}
-                  onChange={(e) => setZoom(parseFloat(e.target.value))}
-                />
-                <span>{Math.round(zoom * 100)}%</span>
+              <div className="toggle-row">
+                <div className="toggle-info">
+                  <span className="toggle-label">Grid Visibility</span>
+                  <span className="toggle-description">Overlay 10x10 line guides</span>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={showGrid}
+                    onChange={(e) => setShowGrid(e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
               </div>
 
-              <MaterialList
-                usageData={patternStats}
-                colorOverrides={colorOverrides}
-                onColorMerge={handleColorMerge}
-              />
-            </div>
-
-            <div className="pattern-preview">
-              {imageData && (
-                <PatternGrid
-                  imageData={imageData}
+              <div className="palette-section">
+                <div className="palette-header">
+                  <span className="palette-title">Current Palette</span>
+                  <a href="#" className="palette-link">DMC Threads</a>
+                </div>
+                <MaterialList
+                  usageData={patternStats}
                   colorOverrides={colorOverrides}
-                  maxColors={maxColors}
-                  zoom={zoom}
-                  onPatternGenerated={setPatternStats}
-                  gridRef={gridRef}
+                  onColorMerge={handleColorMerge}
                 />
-              )}
+              </div>
+
+              <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                <button className="btn-secondary" onClick={() => setOriginalImage(null)}>
+                  ← Start Over
+                </button>
+              </div>
             </div>
-          </div>
+          </>
         )}
       </main>
     </div>
